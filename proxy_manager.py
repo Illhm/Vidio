@@ -1,6 +1,6 @@
 import itertools
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Optional, Set
+from typing import Dict, Optional, Set, Tuple, List
 
 import requests
 
@@ -34,21 +34,30 @@ class ProxyManager:
         self.usage_count: Dict[str, int] = {}
         self._iterator = None
 
+    def _fetch_source(self, item: Tuple[str, str]) -> List[str]:
+        proto, url = item
+        try:
+            resp = requests.get(url, timeout=self.timeout)
+            resp.raise_for_status()
+            return [
+                f"{proto}://{line.strip()}"
+                for line in resp.text.splitlines()
+                if line.strip()
+            ]
+        except requests.RequestException:
+            return []
+
     def download_proxies(self) -> None:
-        collected = []
+        tasks: list[Tuple[str, str]] = []
         for proto, urls in PROXY_SOURCES.items():
             if not isinstance(urls, list):
                 urls = [urls]
-            for url in urls:
-                try:
-                    resp = requests.get(url, timeout=self.timeout)
-                    resp.raise_for_status()
-                    for line in resp.text.splitlines():
-                        line = line.strip()
-                        if line:
-                            collected.append(f"{proto}://{line}")
-                except requests.RequestException:
-                    continue
+            tasks.extend((proto, url) for url in urls)
+
+        with ThreadPoolExecutor(max_workers=self.workers) as exc:
+            fetched_lists = list(exc.map(self._fetch_source, tasks))
+
+        collected = list({p for sub in fetched_lists for p in sub})
 
         with ThreadPoolExecutor(max_workers=self.workers) as exc:
             results = list(exc.map(self._validate_proxy, collected))
