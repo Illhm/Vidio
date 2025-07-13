@@ -23,7 +23,7 @@ python main.py [daftar_akun] [--use-proxy]
 - `daftar_akun` dapat berupa path file lokal atau URL.
 - Gunakan `--use-proxy` untuk mengaktifkan penggunaan proxy dari daftar gratis.
 
-Script ini sekarang mengambil dan memvalidasi daftar proxy secara paralel, sehingga proses pencarian lebih cepat. Setiap proxy otomatis diblacklist setelah digunakan sebanyak tujuh kali. Daftar proxy juga diperluas dengan beberapa sumber gratis tambahan.
+
 
 ## Format Daftar Akun
 

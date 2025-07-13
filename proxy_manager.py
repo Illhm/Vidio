@@ -1,6 +1,10 @@
 import itertools
 from concurrent.futures import ThreadPoolExecutor
+#<<<<<<< codex/perbaiki-kode-pencarian-proxy
 from typing import Dict, Optional, Set, Tuple, List
+#=======
+from typing import Dict, Optional, Set
+#>>>>>>> main
 
 import requests
 
@@ -58,6 +62,8 @@ class ProxyManager:
             fetched_lists = list(exc.map(self._fetch_source, tasks))
 
         collected = list({p for sub in fetched_lists for p in sub})
+        collected = []
+
 
         with ThreadPoolExecutor(max_workers=self.workers) as exc:
             results = list(exc.map(self._validate_proxy, collected))
@@ -93,12 +99,18 @@ class ProxyManager:
                 continue
 
             count = self.usage_count.get(proxy, 0)
+            if proxy in self.blacklist:
+                continue
+
+            count = self.usage_count.get(proxy, 0) + 1
             if count >= self.max_usage:
                 self.blacklist.add(proxy)
                 self.usage_count.pop(proxy, None)
                 continue
 
             self.usage_count[proxy] = count + 1
+            self.usage_count[proxy] = count
+
             return {"http": proxy, "https": proxy}
 
         self._refresh_cycle()
