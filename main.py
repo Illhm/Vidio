@@ -9,7 +9,6 @@ from colorama import Fore, init
 from config import X_API_AUTH
 from proxy_manager import ProxyManager
 
-# ----------------- Variabel Tambahan -----------------
 
 userAgent_vidio = "Vidio/5.86.0 (Android 10; POCO F3)"
 xApiInfo_vidio = "5.86.0;Android;10"
@@ -17,7 +16,6 @@ xApiInfo_vidio = "5.86.0;Android;10"
 def session_id():
     return str(uuid.uuid4())
 
-# ----------------- Fungsi Login -----------------
 
 def fungsi_login(
     email,
@@ -71,7 +69,6 @@ def fungsi_login(
     print(Fore.RED + f"Login gagal untuk {email}")
     return None
 
-# ----------------- Fungsi Get Subs -----------------
 
 def fungsi_get_subs(user_token, email):
     headers = {
@@ -94,7 +91,6 @@ def fungsi_get_subs(user_token, email):
     except (requests.RequestException, KeyError, IndexError):
         return None
 
-# ----------------- Simpan ke file anti duplikat -----------------
 
 def save_to_file(email, password, filename="live.txt"):
     entry = f"{email}:{password}"
@@ -108,7 +104,6 @@ def save_to_file(email, password, filename="live.txt"):
         f.write(entry + "\n")
     print(Fore.GREEN + f"{email} berhasil disimpan.")
 
-# ----------------- Baca Akun dari file & Regex -----------------
 
 def proses_akun(file_akun="akun.txt", proxy_manager: ProxyManager = None):
     if re.match(r"^https?://", file_akun):
@@ -154,7 +149,6 @@ def proses_akun(file_akun="akun.txt", proxy_manager: ProxyManager = None):
         else:
             print(Fore.RED + f"Login gagal untuk {email}")
 
-# ----------------- Run -----------------
 
 if __name__ == "__main__":
     init(autoreset=True)
