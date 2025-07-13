@@ -9,7 +9,6 @@ Script ini digunakan untuk memeriksa status langganan akun Vidio.
 
 ## Variabel Lingkungan
 
-Sebelum menjalankan skrip, set variabel `X_API_AUTH` dengan token API Vidio Anda:
 
 ```bash
 export X_API_AUTH=token_api_anda
@@ -32,4 +31,3 @@ Setiap baris harus berformat seperti berikut:
 https://vidio.com:email@example.com:password
 ```
 
-Hasil akun dengan langganan aktif akan disimpan ke `live.txt`.
