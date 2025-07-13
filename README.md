@@ -9,9 +9,6 @@ Script ini digunakan untuk memeriksa status langganan akun Vidio.
 
 ## Variabel Lingkungan
 
-Secara bawaan skrip menggunakan token API standar sehingga Anda tidak perlu
-menyetel apa pun. Apabila ingin menggunakan token lain, set variabel
-`X_API_AUTH` seperti berikut:
 
 ```bash
 export X_API_AUTH=token_api_anda
@@ -34,10 +31,3 @@ Setiap baris harus berformat seperti berikut:
 https://vidio.com:email@example.com:password
 ```
 
-Hasil akun dengan langganan aktif akan disimpan ke `live.txt`.
-
-## Menjalankan di GitHub Actions
-
-Repositori ini menyertakan workflow sederhana `check.yml` yang dapat
-dijalankan secara manual (workflow dispatch). Masukkan URL daftar akun pada
-kolom `accounts_url` ketika memicu workflow.
