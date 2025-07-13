@@ -5,10 +5,23 @@ from typing import Dict, Optional, Set
 import requests
 
 PROXY_SOURCES = {
-    "http": "https://raw.githubusercontent.com/vmheaven/VMHeaven-Free-Proxy-Updated/refs/heads/main/http.txt",
-    "https": "https://raw.githubusercontent.com/vmheaven/VMHeaven-Free-Proxy-Updated/refs/heads/main/https.txt",
-    "socks4": "https://raw.githubusercontent.com/vmheaven/VMHeaven-Free-Proxy-Updated/refs/heads/main/socks4.txt",
-    "socks5": "https://raw.githubusercontent.com/vmheaven/VMHeaven-Free-Proxy-Updated/refs/heads/main/socks5.txt",
+    "http": [
+        "https://raw.githubusercontent.com/vmheaven/VMHeaven-Free-Proxy-Updated/refs/heads/main/http.txt",
+        "https://raw.githubusercontent.com/casa-ls/proxy-list/refs/heads/main/http",
+        "https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/refs/heads/main/proxy_files/http_proxies.txt",
+        "https://github.com/databay-labs/free-proxy-list/raw/refs/heads/master/http.txt",
+    ],
+    "https": [
+        "https://raw.githubusercontent.com/vmheaven/VMHeaven-Free-Proxy-Updated/refs/heads/main/https.txt",
+        "https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/refs/heads/main/proxy_files/https_proxies.txt",
+        "https://github.com/databay-labs/free-proxy-list/raw/refs/heads/master/https.txt",
+    ],
+    "socks4": [
+        "https://raw.githubusercontent.com/vmheaven/VMHeaven-Free-Proxy-Updated/refs/heads/main/socks4.txt",
+    ],
+    "socks5": [
+        "https://raw.githubusercontent.com/vmheaven/VMHeaven-Free-Proxy-Updated/refs/heads/main/socks5.txt",
+    ],
 }
 
 class ProxyManager:
@@ -23,16 +36,7 @@ class ProxyManager:
 
     def download_proxies(self) -> None:
         collected = []
-        for proto, url in PROXY_SOURCES.items():
-            try:
-                resp = requests.get(url, timeout=self.timeout)
-                resp.raise_for_status()
-                for line in resp.text.splitlines():
-                    line = line.strip()
-                    if line:
-                        collected.append(f"{proto}://{line}")
-            except requests.RequestException:
-                continue
+<<<
 
         with ThreadPoolExecutor(max_workers=self.workers) as exc:
             results = list(exc.map(self._validate_proxy, collected))
