@@ -24,6 +24,7 @@ python main.py [daftar_akun] [--use-proxy]
 - Gunakan `--use-proxy` untuk mengaktifkan penggunaan proxy dari daftar gratis.
 
 
+
 ## Format Daftar Akun
 
 Setiap baris harus berformat seperti berikut:

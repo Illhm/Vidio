@@ -1,6 +1,10 @@
 import itertools
 from concurrent.futures import ThreadPoolExecutor
+#<<<<<<< codex/perbaiki-kode-pencarian-proxy
+from typing import Dict, Optional, Set, Tuple, List
+#=======
 from typing import Dict, Optional, Set
+#>>>>>>> main
 
 import requests
 
@@ -34,9 +38,32 @@ class ProxyManager:
         self.usage_count: Dict[str, int] = {}
         self._iterator = None
 
+    def _fetch_source(self, item: Tuple[str, str]) -> List[str]:
+        proto, url = item
+        try:
+            resp = requests.get(url, timeout=self.timeout)
+            resp.raise_for_status()
+            return [
+                f"{proto}://{line.strip()}"
+                for line in resp.text.splitlines()
+                if line.strip()
+            ]
+        except requests.RequestException:
+            return []
+
     def download_proxies(self) -> None:
+        tasks: list[Tuple[str, str]] = []
+        for proto, urls in PROXY_SOURCES.items():
+            if not isinstance(urls, list):
+                urls = [urls]
+            tasks.extend((proto, url) for url in urls)
+
+        with ThreadPoolExecutor(max_workers=self.workers) as exc:
+            fetched_lists = list(exc.map(self._fetch_source, tasks))
+
+        collected = list({p for sub in fetched_lists for p in sub})
         collected = []
-<<<
+
 
         with ThreadPoolExecutor(max_workers=self.workers) as exc:
             results = list(exc.map(self._validate_proxy, collected))
@@ -67,6 +94,11 @@ class ProxyManager:
 
         for _ in range(len(self.proxies)):
             proxy = next(self._iterator)
+
+            if proxy in self.blacklist:
+                continue
+
+            count = self.usage_count.get(proxy, 0)
             if proxy in self.blacklist:
                 continue
 
@@ -76,7 +108,9 @@ class ProxyManager:
                 self.usage_count.pop(proxy, None)
                 continue
 
+            self.usage_count[proxy] = count + 1
             self.usage_count[proxy] = count
+
             return {"http": proxy, "https": proxy}
 
         self._refresh_cycle()
