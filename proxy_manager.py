@@ -36,19 +36,7 @@ class ProxyManager:
 
     def download_proxies(self) -> None:
         collected = []
-        for proto, urls in PROXY_SOURCES.items():
-            if not isinstance(urls, list):
-                urls = [urls]
-            for url in urls:
-                try:
-                    resp = requests.get(url, timeout=self.timeout)
-                    resp.raise_for_status()
-                    for line in resp.text.splitlines():
-                        line = line.strip()
-                        if line:
-                            collected.append(f"{proto}://{line}")
-                except requests.RequestException:
-                    continue
+<<<
 
         with ThreadPoolExecutor(max_workers=self.workers) as exc:
             results = list(exc.map(self._validate_proxy, collected))
