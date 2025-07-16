@@ -25,7 +25,7 @@ PROXY_SOURCES = {
 }
 
 class ProxyManager:
-    def __init__(self, timeout: int = 5, max_usage: int = 5, workers: int = 50):
+    def __init__(self, timeout: int = 5, max_usage: int = 5, workers: int = 80):
         self.timeout = timeout
         self.max_usage = max_usage
         self.workers = workers
