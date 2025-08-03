@@ -124,7 +124,7 @@ def proses_akun(file_akun="akun.txt", proxy_manager: ProxyManager = None):
         with open(file_akun, "r") as f:
             lines = f.read().splitlines()
 
-    pattern = re.compile(r"https?://(?:www\\.|m\\.)?vidio\\.com:(.+?):(.+)")
+    pattern = re.compile(r"^https?://(?:www\.|m\.)?vidio\.com:([^:]+):(.+)$")
 
     for line in lines:
         match = pattern.match(line)
