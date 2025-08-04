@@ -5,26 +5,24 @@ import requests
 
 PROXY_SOURCES = {
     "http": [
-        "https://raw.githubusercontent.com/vmheaven/VMHeaven-Free-Proxy-Updated/refs/heads/main/http.txt",
-        "https://raw.githubusercontent.com/casa-ls/proxy-list/refs/heads/main/http",
-        "https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/refs/heads/main/proxy_files/http_proxies.txt",
-        "https://github.com/databay-labs/free-proxy-list/raw/refs/heads/master/http.txt",
+        "https://raw.githubusercontent.com/vmheaven/VMHeaven-Free-Proxy-Updated/main/http.txt",
+        "https://raw.githubusercontent.com/casa-ls/proxy-list/main/http",
+        "https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/main/proxy_files/http_proxies.txt",
+        "https://raw.githubusercontent.com/databay-labs/free-proxy-list/master/http.txt",
+        "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
+        "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt",
+        "https://raw.githubusercontent.com/proxy4parsing/proxy-list/main/http.txt",
     ],
     "https": [
-        "https://raw.githubusercontent.com/vmheaven/VMHeaven-Free-Proxy-Updated/refs/heads/main/https.txt",
-        "https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/refs/heads/main/proxy_files/https_proxies.txt",
-        "https://github.com/databay-labs/free-proxy-list/raw/refs/heads/master/https.txt",
-    ],
-    "socks4": [
-        "https://raw.githubusercontent.com/vmheaven/VMHeaven-Free-Proxy-Updated/refs/heads/main/socks4.txt",
-    ],
-    "socks5": [
-        "https://raw.githubusercontent.com/vmheaven/VMHeaven-Free-Proxy-Updated/refs/heads/main/socks5.txt",
+        "https://raw.githubusercontent.com/vmheaven/VMHeaven-Free-Proxy-Updated/main/https.txt",
+        "https://raw.githubusercontent.com/Anonym0usWork1221/Free-Proxies/main/proxy_files/https_proxies.txt",
+        "https://raw.githubusercontent.com/r00tee/Proxy-List/main/Https.txt",
+        "https://raw.githubusercontent.com/databay-labs/free-proxy-list/master/https.txt",
     ],
 }
 
 class ProxyManager:
-    def __init__(self, timeout: int = 2, max_usage: int = 5, workers: int = 50):
+    def __init__(self, timeout: int = 3, max_usage: int = 5, workers: int = 150):
         self.timeout = timeout
         self.max_usage = max_usage
         self.workers = workers
@@ -51,12 +49,9 @@ class ProxyManager:
                     continue
 
         print(f"[ProxyManager] Total proxy terkumpul (mentah): {len(collected)}")
-
-        # Batasi jumlah untuk testing agar tidak terlalu berat
-        collected = collected[:3000]
+        collected = collected[:6000]  # Batasi untuk testing
 
         print("[ProxyManager] Validasi proxy...")
-
         with ThreadPoolExecutor(max_workers=self.workers) as exc:
             results = list(exc.map(self._validate_proxy, collected))
 
