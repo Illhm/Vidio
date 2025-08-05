@@ -26,7 +26,6 @@ python main.py [daftar_akun] [--use-proxy] [--output file] [--workers N]
 - Atur `--workers` untuk menentukan jumlah thread yang digunakan saat memproses akun (default: 20).
 
 
-
 ## Format Daftar Akun
 
 Setiap baris harus berformat:

@@ -46,6 +46,8 @@ def fungsi_login(email, password, proxy_manager: ProxyManager = None, max_retrie
                 return response
         except requests.RequestException as e:
             print(Fore.RED + f"[!] Request error: {e}")
+            if proxy_manager and current_proxy:
+                proxy_manager.report_failure(current_proxy["http"])
         attempt += 1
         if proxy_manager:
             current_proxy = proxy_manager.get_next_proxy()
