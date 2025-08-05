@@ -24,8 +24,6 @@ python main.py [daftar_akun] [--use-proxy] [--output file] [--workers N]
 - Gunakan `--use-proxy` untuk mengaktifkan penggunaan proxy dari daftar gratis.
 - Gunakan `--output` untuk menentukan file hasil akun aktif (default: `live.txt`).
 - Atur `--workers` untuk menentukan jumlah thread yang digunakan saat memproses akun (default: 20).
-- Proxy yang gagal beberapa kali akan otomatis diblacklist dari rotasi.
-
 
 
 ## Format Daftar Akun
