@@ -22,13 +22,21 @@ PROXY_SOURCES = {
 }
 
 class ProxyManager:
-    def __init__(self, timeout: int = 3, max_usage: int = 5, workers: int = 150):
+    def __init__(
+        self,
+        timeout: int = 3,
+        max_usage: int = 5,
+        workers: int = 150,
+        fail_threshold: int = 3,
+    ):
         self.timeout = timeout
         self.max_usage = max_usage
         self.workers = workers
+        self.fail_threshold = fail_threshold
         self.proxies: list[str] = []
         self.blacklist: Set[str] = set()
         self.usage_count: Dict[str, int] = {}
+        self.failures: Dict[str, int] = {}
         self._iterator = None
 
     def download_proxies(self) -> None:
@@ -59,6 +67,7 @@ class ProxyManager:
         print(f"[ProxyManager] Proxy valid: {len(self.proxies)}")
 
         self.usage_count = {p: 0 for p in self.proxies}
+        self.failures.clear()
         self.blacklist.clear()
         self._iterator = itertools.cycle(self.proxies) if self.proxies else None
 
@@ -88,16 +97,30 @@ class ProxyManager:
             if proxy in self.blacklist:
                 continue
 
-            count = self.usage_count.get(proxy, 0) + 1
+            count = self.usage_count.get(proxy, 0)
             if count >= self.max_usage:
                 print(f"[ProxyManager] Proxy mencapai batas penggunaan: {proxy}")
                 self.blacklist.add(proxy)
                 self.usage_count.pop(proxy, None)
                 continue
 
-            self.usage_count[proxy] = count
-            print(f"[ProxyManager] Menggunakan proxy: {proxy} (ke-{count})")
+            self.usage_count[proxy] = count + 1
+            print(f"[ProxyManager] Menggunakan proxy: {proxy} (ke-{count + 1})")
             return {"http": proxy, "https": proxy}
 
         self._refresh_cycle()
         return None
+
+    def report_failure(self, proxy: str) -> None:
+        """Tambahkan penalti pada proxy yang gagal. Blacklist jika melewati ambang."""
+        if proxy in self.blacklist:
+            return
+        failures = self.failures.get(proxy, 0) + 1
+        if failures >= self.fail_threshold:
+            print(f"[ProxyManager] Proxy gagal {failures} kali, blacklist: {proxy}")
+            self.blacklist.add(proxy)
+            self.usage_count.pop(proxy, None)
+            self.failures.pop(proxy, None)
+        else:
+            self.failures[proxy] = failures
+            print(f"[ProxyManager] Proxy gagal {failures} kali: {proxy}")
