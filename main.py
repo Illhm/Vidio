@@ -15,6 +15,9 @@ xApiInfo_vidio = "tv-android/10/2.46.10-743"
 
 # Lock global untuk operasi file agar thread-safe
 file_lock = Lock()
+# Cache untuk menyimpan akun yang sudah tersimpan agar tidak perlu membaca file berulang kali
+# Optimization: Memory cache (set) for O(1) duplicate checks vs O(N) disk reads
+saved_accounts_cache = {}
 
 def session_id():
     return str(uuid.uuid4())
@@ -85,14 +88,19 @@ def fungsi_get_subs(user_token, email):
 def save_to_file(email, password, filename="live.txt"):
     entry = f"{email}:{password}"
     with file_lock:
-        if os.path.exists(filename):
-            with open(filename, "r") as f:
-                data = f.read().splitlines()
-            if entry in data:
-                print(Fore.YELLOW + f"[!] {email} sudah ada di file.")
-                return
+        if filename not in saved_accounts_cache:
+            saved_accounts_cache[filename] = set()
+            if os.path.exists(filename):
+                with open(filename, "r") as f:
+                    saved_accounts_cache[filename].update(f.read().splitlines())
+
+        if entry in saved_accounts_cache[filename]:
+            print(Fore.YELLOW + f"[!] {email} sudah ada di file.")
+            return
+
         with open(filename, "a") as f:
             f.write(entry + "\n")
+        saved_accounts_cache[filename].add(entry)
     print(Fore.GREEN + f"[✓] {email} disimpan ke file.")
 
 
