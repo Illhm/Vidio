@@ -1,4 +1,5 @@
 import itertools
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Optional, Set
 import requests
@@ -38,6 +39,7 @@ class ProxyManager:
         self.usage_count: Dict[str, int] = {}
         self.failures: Dict[str, int] = {}
         self._iterator = None
+        self.lock = threading.Lock()
 
     def download_proxies(self) -> None:
         print("[ProxyManager] Mengunduh proxy dari sumber...")
@@ -84,43 +86,59 @@ class ProxyManager:
 
     def _refresh_cycle(self) -> None:
         print("[ProxyManager] Semua proxy sudah digunakan maksimal. Refresh siklus...")
+        # Lock is held by caller (get_next_proxy)
         self.proxies = [p for p in self.proxies if p not in self.blacklist]
         self._iterator = itertools.cycle(self.proxies) if self.proxies else None
 
     def get_next_proxy(self) -> Optional[dict]:
-        if not self._iterator:
-            print("[ProxyManager] Tidak ada proxy valid tersedia.")
+        with self.lock:
+            if not self._iterator:
+                print("[ProxyManager] Tidak ada proxy valid tersedia.")
+                return None
+
+            # We try up to len(proxies) times to find a usable one
+            # But since we are locked, we should be careful not to block too long.
+            # However, next() is fast.
+            # Using a copy of the list length to avoid infinite loops if proxies change?
+            # self.proxies only changes in _refresh_cycle.
+
+            # Optimization: Try to find a proxy, if loop finishes, refresh.
+            initial_proxy_count = len(self.proxies)
+
+            for _ in range(initial_proxy_count):
+                try:
+                    proxy = next(self._iterator)
+                except StopIteration:
+                    break
+
+                if proxy in self.blacklist:
+                    continue
+
+                count = self.usage_count.get(proxy, 0)
+                if count >= self.max_usage:
+                    print(f"[ProxyManager] Proxy mencapai batas penggunaan: {proxy}")
+                    self.blacklist.add(proxy)
+                    self.usage_count.pop(proxy, None)
+                    continue
+
+                self.usage_count[proxy] = count + 1
+                # print(f"[ProxyManager] Menggunakan proxy: {proxy} (ke-{count + 1})")
+                return {"http": proxy, "https": proxy}
+
+            self._refresh_cycle()
             return None
-
-        for _ in range(len(self.proxies)):
-            proxy = next(self._iterator)
-            if proxy in self.blacklist:
-                continue
-
-            count = self.usage_count.get(proxy, 0)
-            if count >= self.max_usage:
-                print(f"[ProxyManager] Proxy mencapai batas penggunaan: {proxy}")
-                self.blacklist.add(proxy)
-                self.usage_count.pop(proxy, None)
-                continue
-
-            self.usage_count[proxy] = count + 1
-            print(f"[ProxyManager] Menggunakan proxy: {proxy} (ke-{count + 1})")
-            return {"http": proxy, "https": proxy}
-
-        self._refresh_cycle()
-        return None
 
     def report_failure(self, proxy: str) -> None:
         """Tambahkan penalti pada proxy yang gagal. Blacklist jika melewati ambang."""
-        if proxy in self.blacklist:
-            return
-        failures = self.failures.get(proxy, 0) + 1
-        if failures >= self.fail_threshold:
-            print(f"[ProxyManager] Proxy gagal {failures} kali, blacklist: {proxy}")
-            self.blacklist.add(proxy)
-            self.usage_count.pop(proxy, None)
-            self.failures.pop(proxy, None)
-        else:
-            self.failures[proxy] = failures
-            print(f"[ProxyManager] Proxy gagal {failures} kali: {proxy}")
+        with self.lock:
+            if proxy in self.blacklist:
+                return
+            failures = self.failures.get(proxy, 0) + 1
+            if failures >= self.fail_threshold:
+                print(f"[ProxyManager] Proxy gagal {failures} kali, blacklist: {proxy}")
+                self.blacklist.add(proxy)
+                self.usage_count.pop(proxy, None)
+                self.failures.pop(proxy, None)
+            else:
+                self.failures[proxy] = failures
+                print(f"[ProxyManager] Proxy gagal {failures} kali: {proxy}")
